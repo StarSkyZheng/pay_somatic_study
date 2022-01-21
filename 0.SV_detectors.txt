@@ -1,0 +1,131 @@
+CV_detectors
+
+CNVnator:
+read-depth approach (RD); Copy number variation(CNV)
+predicts large deletions and duplications
+run with a bin size of 100bp
+
+./cnvnator [-genome name] -root out.root [-chrom name1 ...] -tree [file1.bam ...] [-unique]
+./cnvnator [-genome name] -root file.root [-chrom name1 ...] -his bin_size [-d dir]
+./cnvnator -root file.root [-chrom name1 ...] -stat bin_size
+./cnvnator -root file.root [-chrom name1 ...] -partition bin_size [-ngc]
+./cnvnator -root file.root [-chrom name1 ...] -call bin_size [-ngc] > result.txt
+./cnvnator2VCF.pl result.txt | bgzip -c > result.vcf.gz
+
+Option -ngc specifies not to use GC corrected RD signal.
+Calls are printed to STDOUT.
+
+docker run -v ~/software/pindel/demo:/data wwliao/cnvnator cnvnator -root /data/t/out.root -tree /data/simulated_sample_1.bam
+
+
+
+The output is as follows:
+
+CNV_type coordinates  CNV_size normalized_RD e-val1 e-val2 e-val3 e-val4 q0
+deletion  1:9901-10200  300      0.381523    277854   0       1      1    1
+
+normalized_RD -- normalized to 1.
+e-val1        -- is calculated using t-test statistics.
+e-val2        -- is from the probability of RD values within the region to be in
+the tails of a gaussian distribution describing frequencies of RD values in bins.
+e-val3        -- same as e-val1 but for the middle of CNV
+e-val4        -- same as e-val2 but for the middle of CNV
+q0            -- fraction of reads mapped with q0 quality
+
+To have correct output of q0 field one needs to use the option -unique when extracting read mapping from bam/sam files.
+
+
+
+>>>MERGING ROOT FILES
+
+./cnvnator [-genome name] -root out.root [-chrom name ...] -merge file1.root ...
+
+Merging can be used when combining read mappings extracted from multiple files.
+Note, histogram generation, statistics calculation, signal partitioning, and
+CNV calling should be completed/redone after merging.
+
+
+CNV_type coordinates CNV_size normalized_RD e-val1 e-val2 e-val3 e-val4 q0
+
+
+
+
+
+pindel:
+a split-read approach
+Results were collected for large deletions (≥ 100bp)
+run with default options
+
+./bam2pindel -i xx.bam -o xx.txt -s ID
+./pindel -f ref.fa -p xx.txt [-c chr2] -o OutPrefix -T 10 
+./pindel2vcf -p OutPrefix_XX -r ref.fa -R <name_and_version_of_reference_genome> -d <date_of_reference_genome_version> [-v out.vcf] 
+
+-P/--pindel_output_root [OutPrefix]
+
+D = deletion
+SI = short insertion
+LI = large insertion
+INV = inversion
+TD = tandem duplication
+BP = unassigned breakpoints
+
+
+DEL D deletion
+RPL D replace
+INS SI/LI insertion
+INV INV inversion
+DUP:TANDEM TD
+
+
+
+
+
+
+Breakdancer:
+from the analysis of discordant pairs
+Deletion, duplication and inversion results
+run with default options
+
+
+
+bam2cfg.pl -g -h bam1 bam2 > config.txt
+breakdancer_max config.txt > config.result
+
+The output format
+----------------------
+BreakDancer's output file consists of the following columns:
+
+1. Chromosome 1
+2. Position 1
+3. Orientation 1
+4. Chromosome 2
+5. Position 2
+6. Orientation 2
+7. Type of a SV 
+8. Size of a SV
+9. Confidence Score
+10. Total number of supporting read pairs
+11. Total number of supporting read pairs from each map file
+12. Estimated allele frequency
+13. Software version
+14. The run parameters
+
+Columns 1-3 and 4-6 are used to specify the coordinates of the two SV breakpoints. The orientation is a string that records the number of reads mapped to the plus (+) or the minus (-) strand in the anchoring regions.
+Column 7 is the type of SV detected: DEL (deletions), INS (insertion), INV (inversion), ITX (intra-chromosomal translocation), CTX (inter-chromosomal translocation), and Unknown. 
+Column 8 is the size of the SV in bp.  It is meaningless for inter-chromosomal translocations. 
+Column 9 is the confidence score associated with the prediction. 
+Column 11 can be used to dissect the origin of the supporting read pairs, which is useful in pooled analysis.  For example, one may want to give SVs that are supported by more than one libraries higher confidence than those detected in only one library.  It can also be used to distinguish somatic events from the germline, i.e., those detected in only the tumor libraries versus those detected in both the tumor and the normal libraries.
+Column 12 is currently a placeholder for displaying estimated allele frequency. The allele frequencies estimated in this version are not accurate and should not be trusted.
+Column 13 and 14 are information useful to reproduce the results.
+
+
+染色体间易位(Interchromosomal translocation, CTX)：不同染色体之间发生的平衡易位产生两条交叉的染色体，不平衡的易位将只会保留一种交叉染色体
+染色体内易位(Intra-chromosome translocation, ITX)；
+转置(Inversion, INV)；
+缺失(Deletion, DEL)；
+插入(Insertion, INS)。
+
+
+
+
+We generated a union set of results collected from all three approaches without further filtering. SVs with a size smaller than 100kbp were directly used. We also include 200bp flanking regions of all inversion events. For SVs larger than 100kbp, we use the 400bp flanking regions around each predicted SV breakpoint. 
